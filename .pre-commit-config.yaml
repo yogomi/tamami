@@ -1,0 +1,13 @@
+ # .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/psf/black
+    rev: 24.3.0
+    hooks:
+      - id: black
+        # 行長を 100 に合わせてチェックのみ（差分を表示）
+        args: [--check, --diff]
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.10  # 使用するruff-pre-commitのタグやバージョンを指定
+    hooks:
+      - id: ruff
+        args: ["."]  # 必要に応じて引数を追加

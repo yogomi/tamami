@@ -1,0 +1,8 @@
+[flake8]
+# PEP 8 の行長チェックを 100 文字に設定
+max-line-length = 100
+
+# Black と競合するルールを無効化
+# - E203: Whitespace before ':' (Black のフォーマット方針と競合)
+# - W503: Line break before binary operator (PEP 8 推奨は W504 側)
+extend-ignore = E203, W503

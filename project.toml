@@ -1,0 +1,30 @@
+[tool.black]
+line-length = 100
+target-version = ['py311']
+skip-string-normalization = false  # 文字列クォートの強制変換を許容
+exclude = '''
+/(
+    \.venv
+    | __pycache__
+    | build
+    | dist
+)/
+'''
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist"
+]
+# 必要に応じて select, ignore など追加
+# select = ["E", "F", "B", "I"]
+# ignore = ["E501"]
+
+[tool.ruff.format]
+# Black互換モード（デフォルト true）
+preview = true
+# line-lengthは[tool.ruff]側の設定が優先される

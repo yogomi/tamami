@@ -1,0 +1,104 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# testmonが残すファイル
+.testmondata
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environment (for Pipenv, venv, virtualenv, etc.)
+.venv/
+venv/
+ENV/
+env/
+pipenv_venv/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Pyre type checker
+.pyre/
+
+# Pytype
+.pytype/
+
+# Pylint
+.pylint.d/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# pre-commit
+.pre-commit-config.yaml.bak
+.pre-commit-hooks.yaml.bak
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# System files
+Thumbs.db
+ehthumbs.db
+Icon?
