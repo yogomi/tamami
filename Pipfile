@@ -12,6 +12,10 @@ fix = "sh -c 'ruff check . --fix && black .'"
 
 [packages]
 torch = "*"
+openai-whisper = "*"
+pyaudio = "*"
+numpy = "*"
+scipy = "*"
 
 [dev-packages]
 pytest = "*"
