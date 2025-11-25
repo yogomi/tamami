@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from audio.input import AudioInputStream, MicrophoneInput, StreamInput
+from src.audio.input import AudioInputStream, MicrophoneInput, StreamInput
 
 
 class TestAudioInputStream:
@@ -85,7 +85,7 @@ class TestStreamInput:
 class TestMicrophoneInput:
     """Tests for the MicrophoneInput class."""
 
-    @patch("audio.input.pyaudio.PyAudio")
+    @patch("src.audio.input.pyaudio.PyAudio")
     def test_init(self, mock_pyaudio):
         """Test MicrophoneInput initialization."""
         mock_audio = MagicMock()
@@ -97,7 +97,7 @@ class TestMicrophoneInput:
         assert mic.get_sample_rate() == 16000
         mic.close()
 
-    @patch("audio.input.pyaudio.PyAudio")
+    @patch("src.audio.input.pyaudio.PyAudio")
     def test_read_chunk(self, mock_pyaudio):
         """Test reading a chunk from microphone."""
         mock_audio = MagicMock()
@@ -116,7 +116,7 @@ class TestMicrophoneInput:
         assert result.dtype == np.float32
         mic.close()
 
-    @patch("audio.input.pyaudio.PyAudio")
+    @patch("src.audio.input.pyaudio.PyAudio")
     def test_close(self, mock_pyaudio):
         """Test closing microphone."""
         mock_audio = MagicMock()
@@ -131,7 +131,7 @@ class TestMicrophoneInput:
         mock_stream.close.assert_called_once()
         mock_audio.terminate.assert_called_once()
 
-    @patch("audio.input.pyaudio.PyAudio")
+    @patch("src.audio.input.pyaudio.PyAudio")
     def test_init_failure(self, mock_pyaudio):
         """Test MicrophoneInput handles initialization failure."""
         mock_audio = MagicMock()

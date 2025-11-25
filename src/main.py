@@ -6,8 +6,8 @@ This module provides the entry point for the audio input to speech recognition p
 import argparse
 import signal
 
-from audio.input import AudioInputStream, MicrophoneInput, StreamInput
-from speech.recognition import WhisperRecognizer
+from src.audio.input import AudioInputStream, MicrophoneInput, StreamInput
+from src.speech.recognition import WhisperRecognizer
 
 
 def parse_args() -> argparse.Namespace:
