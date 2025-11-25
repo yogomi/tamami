@@ -5,7 +5,7 @@ including microphone input and stream-based input.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
 import pyaudio
@@ -199,7 +199,7 @@ class StreamInput(AudioInputStream):
 
     def __init__(
         self,
-        data_source: callable,
+        data_source: Callable[[], bytes],
         sample_rate: int = 16000,
     ) -> None:
         """Initialize stream input.

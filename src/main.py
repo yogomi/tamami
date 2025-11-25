@@ -5,6 +5,8 @@ This module provides the entry point for the audio input to speech recognition p
 
 import argparse
 import signal
+from types import FrameType
+from typing import Optional
 
 from src.audio.input import AudioInputStream, MicrophoneInput, StreamInput
 from src.speech.recognition import WhisperRecognizer
@@ -98,7 +100,7 @@ def main() -> None:
     # Setup signal handler for graceful shutdown
     running = True
 
-    def signal_handler(sig: int, frame: object) -> None:
+    def signal_handler(sig: int, frame: Optional[FrameType]) -> None:
         nonlocal running
         print("\nShutting down...")
         running = False
