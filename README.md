@@ -15,6 +15,20 @@ Pythonのプロジェクトを作る際のベースとなるプロジェクト�
 
 # セットアップ
 
+## 依存ライブラリのインストール
+
+PyAudioを使用するため、システムにportaudioライブラリが必要です。
+
+**macOS:**
+```bash
+$ brew install portaudio
+```
+
+**Ubuntu/Debian:**
+```bash
+$ sudo apt-get install portaudio19-dev
+```
+
 ## pipenvのインストール
 
 すでにpipenvが入っている場合は飛ばして下さい。
@@ -42,6 +56,16 @@ $ git clone git@github.com:stc-zao-developer/python-project-base.git
 ```bash
 $ cd python-project-template
 $ pipenv install --dev
+$ pipenv install
+```
+
+### CPU専用環境（CUDAなし）での設定
+
+GPUがない環境やCUDAがインストールされていない環境では、CPU専用のPyTorchを使用できます。
+依存関係をインストールする前に、以下のコマンドでCPU専用のPyTorchをインストールしてください：
+
+```bash
+$ pipenv run pip install torch --index-url https://download.pytorch.org/whl/cpu
 $ pipenv install
 ```
 
