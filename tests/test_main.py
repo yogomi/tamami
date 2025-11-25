@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from main import create_audio_input, parse_args
+from src.main import create_audio_input, parse_args
 
 
 class TestParseArgs:
@@ -45,7 +45,7 @@ class TestParseArgs:
 class TestCreateAudioInput:
     """Tests for audio input creation."""
 
-    @patch("main.MicrophoneInput")
+    @patch("src.main.MicrophoneInput")
     def test_create_microphone_input(self, mock_mic):
         """Test creating microphone input."""
         mock_mic.return_value = MagicMock()
@@ -54,7 +54,7 @@ class TestCreateAudioInput:
 
     def test_create_stream_input(self):
         """Test creating stream input."""
-        from main import StreamInput
+        from src.main import StreamInput
 
         with patch.object(StreamInput, "__init__", return_value=None):
             create_audio_input("stream")

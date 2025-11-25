@@ -3,6 +3,6 @@
 This module provides audio input functionality for the real-time voice translation system.
 """
 
-from audio.input import AudioInputStream, MicrophoneInput, StreamInput
+from src.audio.input import AudioInputStream, MicrophoneInput, StreamInput
 
 __all__ = ["AudioInputStream", "MicrophoneInput", "StreamInput"]

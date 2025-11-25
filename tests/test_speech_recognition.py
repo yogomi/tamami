@@ -5,13 +5,13 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from speech.recognition import WhisperRecognizer
+from src.speech.recognition import WhisperRecognizer
 
 
 class TestWhisperRecognizer:
     """Tests for the WhisperRecognizer class."""
 
-    @patch("speech.recognition.whisper.load_model")
+    @patch("src.speech.recognition.whisper.load_model")
     def test_init_valid_model(self, mock_load_model):
         """Test initialization with a valid model name."""
         mock_model = MagicMock()
@@ -26,7 +26,7 @@ class TestWhisperRecognizer:
         with pytest.raises(ValueError, match="Invalid model name"):
             WhisperRecognizer(model_name="invalid_model")
 
-    @patch("speech.recognition.whisper.load_model")
+    @patch("src.speech.recognition.whisper.load_model")
     def test_transcribe_basic(self, mock_load_model):
         """Test basic transcription."""
         mock_model = MagicMock()
@@ -34,9 +34,7 @@ class TestWhisperRecognizer:
         mock_model.transcribe.return_value = {
             "text": "Hello world",
             "language": "en",
-            "segments": [
-                {"id": 0, "start": 0.0, "end": 1.0, "text": "Hello world"}
-            ],
+            "segments": [{"id": 0, "start": 0.0, "end": 1.0, "text": "Hello world"}],
         }
 
         recognizer = WhisperRecognizer()
@@ -47,7 +45,7 @@ class TestWhisperRecognizer:
         assert result["language"] == "en"
         assert len(result["segments"]) == 1
 
-    @patch("speech.recognition.whisper.load_model")
+    @patch("src.speech.recognition.whisper.load_model")
     def test_transcribe_with_language(self, mock_load_model):
         """Test transcription with specified language."""
         mock_model = MagicMock()
@@ -66,7 +64,7 @@ class TestWhisperRecognizer:
         call_kwargs = mock_model.transcribe.call_args[1]
         assert call_kwargs.get("language") == "ja"
 
-    @patch("speech.recognition.whisper.load_model")
+    @patch("src.speech.recognition.whisper.load_model")
     def test_transcribe_converts_dtype(self, mock_load_model):
         """Test transcription converts audio to float32."""
         mock_model = MagicMock()
@@ -86,9 +84,9 @@ class TestWhisperRecognizer:
         call_args = mock_model.transcribe.call_args[0]
         assert call_args[0].dtype == np.float32
 
-    @patch("speech.recognition.whisper.load_model")
-    @patch("speech.recognition.whisper.pad_or_trim")
-    @patch("speech.recognition.whisper.log_mel_spectrogram")
+    @patch("src.speech.recognition.whisper.load_model")
+    @patch("src.speech.recognition.whisper.pad_or_trim")
+    @patch("src.speech.recognition.whisper.log_mel_spectrogram")
     def test_detect_language(self, mock_log_mel, mock_pad_trim, mock_load_model):
         """Test language detection."""
         mock_model = MagicMock()
@@ -109,7 +107,7 @@ class TestWhisperRecognizer:
 
         assert language == "en"
 
-    @patch("speech.recognition.whisper.load_model")
+    @patch("src.speech.recognition.whisper.load_model")
     def test_valid_models(self, mock_load_model):
         """Test all valid model names."""
         mock_model = MagicMock()

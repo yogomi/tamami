@@ -98,12 +98,14 @@ class WhisperRecognizer:
         # Extract segments
         segments: List[Dict[str, Any]] = []
         for segment in result.get("segments", []):
-            segments.append({
-                "id": segment.get("id"),
-                "start": segment.get("start"),
-                "end": segment.get("end"),
-                "text": segment.get("text"),
-            })
+            segments.append(
+                {
+                    "id": segment.get("id"),
+                    "start": segment.get("start"),
+                    "end": segment.get("end"),
+                    "text": segment.get("text"),
+                }
+            )
 
         return {
             "text": result.get("text", "").strip(),
