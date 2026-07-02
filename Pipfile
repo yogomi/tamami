@@ -5,6 +5,7 @@ name = "pypi"
 
 [scripts]
 start = "python -m src.main"
+serve = "python -m src.server"
 test = "pytest -s"
 watch = "ptw --config pytest.ini --runner 'pytest --testmon -s'"
 check = "pre-commit run --all-files"
@@ -15,6 +16,8 @@ openai-whisper = "*"
 pyaudio = "*"
 numpy = "*"
 scipy = "*"
+aiortc = "*"
+aiohttp = "*"
 
 [dev-packages]
 pytest = "*"
