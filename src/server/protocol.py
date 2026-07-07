@@ -61,9 +61,7 @@ def parse_client_message(raw: str) -> dict[str, Any]:
     except json.JSONDecodeError as e:
         raise ProtocolError("invalid_config", f"invalid JSON: {e}") from e
     if not isinstance(message, dict) or not isinstance(message.get("type"), str):
-        raise ProtocolError(
-            "invalid_config", "message must be an object with a string 'type'"
-        )
+        raise ProtocolError("invalid_config", "message must be an object with a string 'type'")
     return message
 
 

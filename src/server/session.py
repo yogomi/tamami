@@ -91,9 +91,7 @@ class StreamingSession:
         @pc.on("track")
         def on_track(track: MediaStreamTrack) -> None:
             if track.kind != "audio":
-                logger.warning(
-                    "[%s] ignoring non-audio track: %s", self._session_id, track.kind
-                )
+                logger.warning("[%s] ignoring non-audio track: %s", self._session_id, track.kind)
                 return
             logger.info("[%s] audio track received", self._session_id)
             self._consumer_task = asyncio.ensure_future(self._consume(track))
@@ -127,14 +125,9 @@ class StreamingSession:
                     self._samples_received += len(pcm)
                     self._window_sum_squares += float(np.sum((pcm / 32768.0) ** 2))
                     self._window_samples += len(pcm)
-                if (
-                    self._samples_received - last_report_samples
-                    >= report_interval_samples
-                ):
+                if self._samples_received - last_report_samples >= report_interval_samples:
                     last_report_samples = self._samples_received
-                    await self._on_report(
-                        False, self.received_seconds, self._window_level_db()
-                    )
+                    await self._on_report(False, self.received_seconds, self._window_level_db())
                     self._window_sum_squares = 0.0
                     self._window_samples = 0
         except asyncio.CancelledError:

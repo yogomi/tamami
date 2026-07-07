@@ -21,9 +21,7 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description="tamami streaming translation server")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="bind address")
-    parser.add_argument(
-        "--port", type=int, default=8765, help="listen port (default: 8765)"
-    )
+    parser.add_argument("--port", type=int, default=8765, help="listen port (default: 8765)")
     return parser.parse_args()
 
 

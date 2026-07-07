@@ -54,9 +54,7 @@ class ConnectionHandler:
                         break
                 elif message.type == WSMsgType.BINARY:
                     # バージョン 1 では上りバイナリフレームは未定義（音声はWebRTC側）
-                    logger.warning(
-                        "[%s] unexpected binary frame ignored", self._session_id
-                    )
+                    logger.warning("[%s] unexpected binary frame ignored", self._session_id)
                 elif message.type == WSMsgType.ERROR:
                     logger.warning(
                         "[%s] websocket error: %s",
@@ -82,9 +80,7 @@ class ConnectionHandler:
             message = protocol.parse_client_message(raw)
             return await self._dispatch(message)
         except protocol.ProtocolError as e:
-            logger.warning(
-                "[%s] protocol error: %s (%s)", self._session_id, e.message, e.code
-            )
+            logger.warning("[%s] protocol error: %s (%s)", self._session_id, e.message, e.code)
             await self._send(protocol.make_error(e.code, e.message, e.fatal))
             return not e.fatal
         except Exception as e:
@@ -112,18 +108,14 @@ class ConnectionHandler:
         elif message_type == "ping":
             client_ts_ms = message.get("client_ts_ms")
             if not isinstance(client_ts_ms, int):
-                raise protocol.ProtocolError(
-                    "invalid_config", "ping requires client_ts_ms", False
-                )
+                raise protocol.ProtocolError("invalid_config", "ping requires client_ts_ms", False)
             await self._send(protocol.make_pong(client_ts_ms))
         elif message_type == "session_end":
             await self._on_session_end()
             return False
         else:
             # 前方互換のため未知の種別は無視する
-            logger.warning(
-                "[%s] unknown message type ignored: %s", self._session_id, message_type
-            )
+            logger.warning("[%s] unknown message type ignored: %s", self._session_id, message_type)
         return True
 
     async def _on_session_start(self, message: dict[str, Any]) -> None:
@@ -153,18 +145,14 @@ class ConnectionHandler:
             ProtocolError: session_start 前の受信、SDP 不正、確立失敗の場合。
         """
         if self._session is None:
-            raise protocol.ProtocolError(
-                "invalid_config", "webrtc_offer before session_start"
-            )
+            raise protocol.ProtocolError("invalid_config", "webrtc_offer before session_start")
         sdp = message.get("sdp")
         if not isinstance(sdp, str) or not sdp:
             raise protocol.ProtocolError("webrtc_failure", "webrtc_offer requires sdp")
         try:
             answer_sdp = await self._session.handle_offer(sdp)
         except Exception as e:
-            raise protocol.ProtocolError(
-                "webrtc_failure", f"failed to establish: {e}"
-            ) from e
+            raise protocol.ProtocolError("webrtc_failure", f"failed to establish: {e}") from e
         await self._send(protocol.make_webrtc_answer(answer_sdp))
         logger.info("[%s] webrtc answer sent", self._session_id)
 
@@ -178,9 +166,7 @@ class ConnectionHandler:
         if self._session is not None:
             await self._session.flush()
 
-    async def _on_report(
-        self, is_final: bool, ts_audio_end: float, level_db: float
-    ) -> None:
+    async def _on_report(self, is_final: bool, ts_audio_end: float, level_db: float) -> None:
         """セッションからのエコーレポートを asr メッセージとして配信する.
 
         ASR 接続時（STREAMING_PLAN.md 着手順 4）はこの実装を認識結果の
