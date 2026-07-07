@@ -1,5 +1,5 @@
-# Pipenv lock file (generated per-environment due to CUDA/CPU dependencies)
-Pipfile.lock
+# uv lock file (generated per-environment due to CUDA/CPU dependencies)
+uv.lock
 
 __pycache__/
 *.py[cod]
