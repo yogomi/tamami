@@ -83,7 +83,23 @@ Nemotron 3.5 ASR は **ASR 専用であり、翻訳機能を持たない**（音
 
 ## 未決事項
 
-- Whisper（`WhisperRecognizer`）から Nemotron 3.5 ASR への具体的な移行手順・インターフェース設計
-- NeMo によるストリーミング推論の最小構成と、音声入力（`src/audio/input.py`）との接続部
-- チャンクサイズ（80ms〜1120ms）と精度・遅延のトレードオフ検証
+- ~~Whisper（`WhisperRecognizer`）から Nemotron 3.5 ASR への具体的な移行手順・
+  インターフェース設計~~ → 解決済み。`src/speech/streaming.py` に
+  `StreamingRecognizer` 抽象（ワーカースレッド・チャンク再バッファ・
+  バックプレッシャ検出を共通化し、サブクラスは `_process` / `_finalize` のみ実装する）
+  を導入し、開発・テスト用の `FakeStreamingRecognizer`（`src/speech/fake.py`）と
+  Nemotronドラフト実装 `NemotronStreamingRecognizer`（`src/speech/nemotron.py`）を
+  用意した。`src/server/session.py` はこの抽象経由でASRに接続する構成になっている。
+- **Nemotron 3.5 ASR の実機検証（DGX Spark / NGCコンテナ）**：
+  `src/speech/nemotron.py` はNeMoのcache-awareストリーミングAPI
+  （`get_initial_cache_state` / `conformer_stream_step` 等）の正確なシグネチャが
+  手元で確認できないまま書いたドラフトであり、`# TODO(DGX検証)` を付けた箇所を
+  実機で確認・修正する必要がある。
+- チャンクサイズ（80ms〜1120ms、`att_context_size` 経由）と精度・遅延のトレードオフ検証
+  （実機検証と合わせて行う）。
+- **EOU代替の無音endpointingのチューニング**：セグメント確定は現状
+  `SilenceEndpointer`（`silence_threshold_db` / `min_silence_sec`）で行っている
+  （モデルカードにEOU検出の記載がないため）。閾値・継続秒数の実環境（マイク・
+  背景ノイズ）でのチューニングが必要。将来的にはNemotron側の実発話終端検出
+  （提供されれば）やSilero VAD等への差し替えも検討する。
 - ASR 出力テキストと NLLB 翻訳段の連携方法（逐次翻訳の単位・タイミング）

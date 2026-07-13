@@ -101,6 +101,38 @@ $ uv run python -m src.main
 $ uv run python -m src.server
 ```
 
+デフォルトでは `--asr fake` が使われ、GPUを持たないMac上でも動作する開発・テスト用の
+代役認識器（`FakeStreamingRecognizer`）に接続されます。本物のASR
+（`nvidia/nemotron-3.5-asr-streaming-0.6b`）を使う場合は `--asr nemotron` を指定します。
+
+```bash
+$ uv run python -m src.server --asr fake                     # デフォルト。Macでも動く
+$ uv run python -m src.server --asr nemotron --chunk-ms 560   # 要GPU（後述）
+```
+
+`--chunk-ms` は `--asr nemotron` の場合のみ有効で、80/160/320/560/1120から選べます
+（値の意味は `SPEC.md` を参照）。
+
+### Nemotron ASRの実行（NGCコンテナ、要GPU）
+
+`NemotronStreamingRecognizer`（`src/speech/nemotron.py`）はNVIDIAのGB10 GPU等を前提と
+した実装で、**このリポジトリのuv環境（Mac等CPUのみの環境）では動作しません**。
+NeMo・PyTorch（CUDA版）はpyproject.tomlに追加していません。DGX Spark等での運用は
+NVIDIA公式のNGCコンテナ（NeMoコンテナ）内で行うことを前提とします。
+
+- イメージは latest 等のフローティングタグではなく **digest（`@sha256:...`）で固定**
+  して運用する（再現性のため）。
+- **本番はコンテナ同梱のpythonで起動し、uvは開発専用とする。**
+  uvが作る隔離venvはコンテナに同梱されたNeMo（およびCUDA版PyTorch）を参照しないため、
+  `uv run python -m src.server --asr nemotron` はNGCコンテナ内であっても動作しない。
+  コンテナ内では `python -m src.server --asr nemotron --chunk-ms 560` のように、
+  コンテナのシステムpythonから直接起動すること。
+- `NemotronStreamingRecognizer.load_model()` はプロセス起動時に1回だけ呼ばれ、
+  複数セッションでモデルの重みを共有する。ロード失敗時はプロセスがその場で終了する。
+- `src/speech/nemotron.py` は実機（DGX Spark）未検証のドラフトである。NeMoの
+  cache-awareストリーミングAPIの正確なシグネチャに不明点が残っており、該当箇所には
+  `# TODO(DGX検証)` を付けている。詳細は `SPEC.md` の「未決事項」を参照。
+
 ## テストの実行
 
 テストはtestsディレクトリ以下に配置されます。

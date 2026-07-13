@@ -1,41 +1,56 @@
-"""シグナリング + 結果配信の WebSocket サーバー.
+"""シグナリング + 結果配信のWebSocketサーバー.
 
-PROTOCOL.md に定義された制御チャネル（`/ws`）を提供する。
-接続ごとの流れ: session_start → session_ready → webrtc_offer → webrtc_answer →
-音声受信（エコーレポートを asr として配信）→ session_end。
+PROTOCOL.mdに定義された制御チャネル（`/ws`）を提供する。接続ごとの流れ:
+session_start → session_ready → webrtc_offer → webrtc_answer →
+音声受信・ストリーミング認識（asrとして配信）→ session_end。
 """
 
 import asyncio
 import json
 import logging
 import uuid
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from aiohttp import WSMsgType, web
 
 from src.server import protocol
 from src.server.session import StreamingSession
+from src.speech.streaming import AsrEvent, StreamingRecognizer
 
 logger = logging.getLogger(__name__)
 
-# エコー実装では単一セグメントを更新し続ける（PROTOCOL.md の置き換えセマンティクス）
-ECHO_SEGMENT_ID = 0
+# セッションごとに新しいStreamingRecognizerを生成するファクトリの型
+RecognizerFactory = Callable[[], StreamingRecognizer]
+
+# aiohttp.web.Applicationにrecognizer_factoryを持たせる際のキー
+# （aiohttpの推奨に従い、プレーンな文字列キーではなくAppKeyを使う）
+_RECOGNIZER_FACTORY_KEY: web.AppKey[RecognizerFactory] = web.AppKey(
+    "recognizer_factory", RecognizerFactory
+)
 
 
 class ConnectionHandler:
-    """1 つの WebSocket 接続のプロトコル状態を管理する.
+    """1つのWebSocket接続のプロトコル状態を管理する.
 
     Args:
-        ws: 確立済みの WebSocket レスポンス。
+        ws: 確立済みのWebSocketレスポンス。
+        recognizer_factory: セッションごとに新しいStreamingRecognizerを
+            生成するファクトリ。
+
+    Attributes:
+        なし（すべて非公開状態として保持する）。
     """
 
-    def __init__(self, ws: web.WebSocketResponse) -> None:
+    def __init__(self, ws: web.WebSocketResponse, recognizer_factory: RecognizerFactory) -> None:
         """ハンドラを初期化する.
 
         Args:
-            ws: 確立済みの WebSocket レスポンス。
+            ws: 確立済みのWebSocketレスポンス。
+            recognizer_factory: セッションごとに新しいStreamingRecognizerを
+                生成するファクトリ。
         """
         self._ws = ws
+        self._recognizer_factory = recognizer_factory
         self._send_lock = asyncio.Lock()
         self._session_id: Optional[str] = None
         self._session: Optional[StreamingSession] = None
@@ -43,7 +58,7 @@ class ConnectionHandler:
     async def run(self) -> None:
         """メッセージループを実行する.
 
-        受信メッセージをディスパッチし、プロトコル違反時は error を送って
+        受信メッセージをディスパッチし、プロトコル違反時はerrorを送って
         必要に応じて接続を閉じる。終了時にセッション資源を解放する。
         """
         try:
@@ -68,13 +83,13 @@ class ConnectionHandler:
             logger.info("[%s] connection closed", self._session_id)
 
     async def _handle_text(self, raw: str) -> bool:
-        """テキストフレーム 1 件を処理する.
+        """テキストフレーム1件を処理する.
 
         Args:
-            raw: 受信した JSON 文字列。
+            raw: 受信したJSON文字列。
 
         Returns:
-            接続を継続する場合 True、閉じる場合 False。
+            接続を継続する場合True、閉じる場合False。
         """
         try:
             message = protocol.parse_client_message(raw)
@@ -95,7 +110,7 @@ class ConnectionHandler:
             message: 解析済みのクライアントメッセージ。
 
         Returns:
-            接続を継続する場合 True、閉じる場合 False。
+            接続を継続する場合True、閉じる場合False。
 
         Raises:
             ProtocolError: プロトコル順序違反・内容不正の場合。
@@ -119,10 +134,10 @@ class ConnectionHandler:
         return True
 
     async def _on_session_start(self, message: dict[str, Any]) -> None:
-        """session_start を処理し、session_ready を返す.
+        """session_startを処理し、session_readyを返す.
 
         Args:
-            message: session_start メッセージ。
+            message: session_startメッセージ。
 
         Raises:
             ProtocolError: 検証失敗、または二重送信の場合。
@@ -131,18 +146,21 @@ class ConnectionHandler:
             raise protocol.ProtocolError("invalid_config", "session already started")
         protocol.validate_session_start(message)
         self._session_id = uuid.uuid4().hex[:8]
-        self._session = StreamingSession(self._session_id, self._on_report)
+        recognizer = self._recognizer_factory()
+        self._session = StreamingSession(
+            self._session_id, recognizer, self._on_asr_event, self._on_fatal
+        )
         await self._send(protocol.make_session_ready(self._session_id))
         logger.info("[%s] session started", self._session_id)
 
     async def _on_webrtc_offer(self, message: dict[str, Any]) -> None:
-        """webrtc_offer を処理し、webrtc_answer を返す.
+        """webrtc_offerを処理し、webrtc_answerを返す.
 
         Args:
-            message: webrtc_offer メッセージ。
+            message: webrtc_offerメッセージ。
 
         Raises:
-            ProtocolError: session_start 前の受信、SDP 不正、確立失敗の場合。
+            ProtocolError: session_start前の受信、SDP不正、確立失敗の場合。
         """
         if self._session is None:
             raise protocol.ProtocolError("invalid_config", "webrtc_offer before session_start")
@@ -157,33 +175,45 @@ class ConnectionHandler:
         logger.info("[%s] webrtc answer sent", self._session_id)
 
     async def _on_session_end(self) -> None:
-        """session_end を処理する.
+        """session_endを処理する.
 
-        処理中の音声をフラッシュして確定レポートを送る。呼び出し後、
-        run() のループが接続を閉じる。
+        処理中の音声をフラッシュし、確定結果を出し切るまで待つ。呼び出し後、
+        run()のループが接続を閉じる。
         """
         logger.info("[%s] session end requested", self._session_id)
         if self._session is not None:
             await self._session.flush()
 
-    async def _on_report(self, is_final: bool, ts_audio_end: float, level_db: float) -> None:
-        """セッションからのエコーレポートを asr メッセージとして配信する.
-
-        ASR 接続時（STREAMING_PLAN.md 着手順 4）はこの実装を認識結果の
-        配信に置き換える。
+    async def _on_asr_event(self, event: AsrEvent) -> None:
+        """認識器からのAsrEventをasrメッセージとして配信する.
 
         Args:
-            is_final: 確定レポートかどうか。
-            ts_audio_end: 音声タイムライン上の受信済み秒数。
-            level_db: 直近ウィンドウの音声レベル（dBFS）。
+            event: 認識結果イベント。
         """
-        text = f"echo: received {ts_audio_end:.1f}s, level {level_db:.1f} dBFS"
         await self._send(
-            protocol.make_asr(ECHO_SEGMENT_ID, text, "ja", is_final, 0.0, ts_audio_end)
+            protocol.make_asr(
+                event.segment_id,
+                event.text,
+                event.lang,
+                event.is_final,
+                event.ts_audio_start,
+                event.ts_audio_end,
+            )
         )
 
+    async def _on_fatal(self, code: str, message: str) -> None:
+        """認識器からの致命的エラーをerrorメッセージとして配信し、接続を閉じる.
+
+        Args:
+            code: PROTOCOL.mdに定義されたエラーコード（"overloaded"等）。
+            message: エラー内容。
+        """
+        logger.error("[%s] fatal recognizer error: %s (%s)", self._session_id, message, code)
+        await self._send(protocol.make_error(code, message, True))
+        await self._ws.close()
+
     async def _send(self, message: dict[str, Any]) -> None:
-        """JSON メッセージを送信する（複数タスクからの送信を直列化する）.
+        """JSONメッセージを送信する（複数タスクからの送信を直列化する）.
 
         Args:
             message: 送信するメッセージ。
@@ -195,28 +225,34 @@ class ConnectionHandler:
 
 
 async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
-    """`/ws` エンドポイントのハンドラ.
+    """`/ws`エンドポイントのハンドラ.
 
     Args:
-        request: aiohttp のリクエスト。
+        request: aiohttpのリクエスト。
 
     Returns:
-        クローズ済みの WebSocket レスポンス。
+        クローズ済みのWebSocketレスポンス。
     """
     ws = web.WebSocketResponse(heartbeat=30.0)
     await ws.prepare(request)
-    handler = ConnectionHandler(ws)
+    recognizer_factory = request.app[_RECOGNIZER_FACTORY_KEY]
+    handler = ConnectionHandler(ws, recognizer_factory)
     await handler.run()
     await ws.close()
     return ws
 
 
-def create_app() -> web.Application:
-    """WebSocket サーバーの aiohttp アプリケーションを生成する.
+def create_app(recognizer_factory: RecognizerFactory) -> web.Application:
+    """WebSocketサーバーのaiohttpアプリケーションを生成する.
+
+    Args:
+        recognizer_factory: セッションごとに新しいStreamingRecognizerを
+            生成するファクトリ。
 
     Returns:
-        `/ws` ルートを持つ aiohttp アプリケーション。
+        `/ws`ルートを持つaiohttpアプリケーション。
     """
     app = web.Application()
+    app[_RECOGNIZER_FACTORY_KEY] = recognizer_factory
     app.router.add_get("/ws", websocket_handler)
     return app
