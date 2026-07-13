@@ -11,7 +11,7 @@ import logging
 from typing import Awaitable, Callable, Optional
 
 import numpy as np
-from aiortc import RTCPeerConnection, RTCSessionDescription
+from aiortc import RTCConfiguration, RTCPeerConnection, RTCSessionDescription
 from aiortc.mediastreams import MediaStreamError, MediaStreamTrack
 from av.audio.resampler import AudioResampler
 
@@ -99,7 +99,13 @@ class StreamingSession:
         Raises:
             ValueError: SDPの解釈に失敗した場合（aiortc由来）。
         """
-        pc = RTCPeerConnection()
+        # ICEサーバーは設定しない（LAN内のホスト候補のみで接続する）。
+        # aiortcのデフォルトはGoogleのSTUNサーバーで、aioiceがそのDNS解決を
+        # タイムアウトなしのexecutorジョブとして実行するため、DNSが応答しない
+        # 環境ではスレッドが残り続けプロセス終了時のjoinが固まる。また収集完了を
+        # setLocalDescription内で待つため、answer生成の遅延要因にもなる。
+        # NAT越えが必要になったら、STUN / TURNはIPアドレス指定で設定すること。
+        pc = RTCPeerConnection(RTCConfiguration(iceServers=[]))
         self._pc = pc
 
         @pc.on("track")
