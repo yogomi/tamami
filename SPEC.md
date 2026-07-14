@@ -10,7 +10,8 @@
 - 話者識別：なし
 - 許容遅延：可能な限りリアルタイムに近づける（旧仕様は 6〜12 秒。
   再策定した遅延目標と方針は `STREAMING_PLAN.md` を参照）
-- 音声入力：マイク（`src/audio/input.py`）
+- 音声入力：クライアント（tamami-remote-client）のマイクから WebRTC で受信
+  （サーバー側の受信処理は `src/server/session.py`）
 
 ---
 
@@ -20,8 +21,9 @@
 
 音声認識には **`nvidia/nemotron-3.5-asr-streaming-0.6b`** を採用する。
 
-現状の実装は OpenAI Whisper（`src/speech/recognition.py` の `WhisperRecognizer`、
-`openai-whisper` パッケージ）を用いているが、これを Nemotron 3.5 ASR へ移行する方針とする。
+初期の実装は OpenAI Whisper（`WhisperRecognizer`、`openai-whisper` パッケージ）を
+用いていたが、Nemotron 3.5 ASR（`src/speech/nemotron.py`）へ移行済み。
+Whisper 系の旧実装（マイク入力・バッチ認識のローカルパイプライン）は削除した。
 
 ### 採用理由
 

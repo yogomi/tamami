@@ -4,17 +4,10 @@ version = "0.1.0"
 description = "リアルタイムストリーミング翻訳サーバー"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-    "openai-whisper>=20250625",
-    "pyaudio",
     "numpy",
-    "scipy",
     "aiortc",
     "aiohttp",
 ]
-
-[tool.uv]
-# openai-whisper経由のnumbaが古い版（numpy上限なし）へ後退しないよう下限を設ける
-constraint-dependencies = ["numba>=0.61"]
 
 [dependency-groups]
 dev = [

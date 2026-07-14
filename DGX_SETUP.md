@@ -67,8 +67,9 @@ pip install aiortc aiohttp
 python -c "import aiortc, aiohttp, nemo.collections.asr"  # 導入確認
 ```
 
-注意: `pyproject.toml` の `openai-whisper` / `pyaudio` / `scipy` は旧実装・クライアント
-側の依存であり、`--asr nemotron` でのサーバー実行には不要（インストールしない）。
+注意: 依存は上記2つで足りる。`pyproject.toml` の依存（numpy / aiortc / aiohttp）の
+うち numpy はコンテナに同梱されている（Whisper 系旧実装とその依存
+`openai-whisper` / `pyaudio` / `scipy` は削除済み）。
 
 ## 2. 実機検証チェックリスト
 
