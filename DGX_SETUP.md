@@ -58,13 +58,72 @@ docker run --rm nvcr.io/nvidia/nemo:<タグ> python -c \
   "import nemo.collections.asr.models.rnnt_bpe_models_prompt"
 ```
 
-### 代替経路（未評価）
+### ASR バックエンドの選定方針（2026-07-15 決定）
 
 モデルカードには Transformers（`transformers>=5.13.0`）の `AutoModelForRNNT` +
 `AutoProcessor` によるストリーミング推論経路も記載されている
-（`set_num_lookahead_tokens` / チャンクごとの言語プロンプト指定）。NeMo git main への
-依存を避け、リリース版ライブラリにバージョン固定できる可能性があるため、
-2 章の検証と並行して比較する。
+（`set_num_lookahead_tokens` / チャンクごとの言語プロンプト指定 / `target_lang="auto"`）。
+セカンドオピニオン（別コンテキスト・Opus）とも一致した結論として、次の段階的戦略を採る。
+
+1. **第一候補: Transformers リリース版**（`transformers==5.13.1` で解決確認済み）
+   - 理由: 後段の NLLB と同一フレームワークでスタックが完結する。リリース版に
+     バージョン固定でき再現性が高い。コンテナを軽量ベース + pip で構成できる
+   - Phase 0（タイムボックス付き PoC）の検証項目:
+     - [x] 暫定認識テキストが発話から 1 秒以内に取得できるか
+           → 合格。チャンク 585ms + 推論 50ms ≈ 0.64 秒（詳細は下の検証結果）
+     - [x] `target_lang="auto"` の言語検出が uk / ja で実用になるか
+           → 合格。FLEURS 実音声で両言語とも正しく認識、`<ja-JP>` 形式タグも出力
+     - [x] チャンク境界・ジッタ下でストリーミングの状態管理が破綻しないか
+           → 設計上問題なし。API は固定長チャンク（9,360 サンプル）の供給を要求し、
+           既存 `StreamingRecognizer` のチャンク再バッファがこれを吸収する。
+           実ジッタ下の最終確認は 3 章の E2E 検証で行う
+2. **フォールバック: NeMo git commit 固定**（`24c4f58a7643`、ロード確認済み）
+   - Phase 0 が不合格の場合のみ採用する。cache-aware streaming API のドラフト
+     （`src/speech/nemotron.py`）を 2 章のチェックリストに沿って検証する
+   - リスク: 未リリース API への依存、NLLB 側 transformers とのバージョン競合、
+     コンテナが重くなる（NGC or git ビルド）
+
+どちらに決めても `StreamingRecognizer` 抽象は維持し、バックエンドを差し替え可能に保つ。
+
+### Phase 0 検証結果（2026-07-15〜16 実施）→ Transformers 採用を確定
+
+検証項目 3 点すべて合格（上のチェックリスト参照）。ASR バックエンドは
+**Transformers リリース版**に決定した。2 章の NeMo チェックリストはフォールバック時のみ
+実施する。PoC スクリプトは `poc/` に取り込み済み:
+
+- `poc/streaming_latency.py` — 実時間ペーシングでの遅延実測
+- `poc/langid_auto.py` — uk / ja の自動言語検出（FLEURS サンプル）
+
+実行環境の再現手順（素の環境）:
+
+```bash
+uv venv --python 3.13 <venv>
+VIRTUAL_ENV=<venv> uv pip install torch --index-url https://download.pytorch.org/whl/cu130
+VIRTUAL_ENV=<venv> uv pip install 'transformers>=5.13.0' accelerate soundfile librosa datasets
+```
+
+実測値（GB10、torch 2.13.0+cu130 / transformers 5.13.1、lookahead 6 トークン、fp32）:
+
+| 指標 | 実測値 |
+|------|--------|
+| チャンク長 | 585ms（公称 streaming latency 560ms） |
+| チャンクあたり推論時間（定常時） | 最悪 50ms |
+| 発話 → 暫定テキスト | 約 0.64 秒（目標 1 秒以内を達成） |
+| RTF（実時間比） | 0.067（約 15 倍速で処理可能） |
+| 音声供給終了 → 最終テキスト | 0.01 秒 |
+
+補足:
+
+- モデルクラスは `Nemotron3_5AsrForRNNT` / `Nemotron3_5AsrProcessor`
+- 選択可能な遅延段階は lookahead 0 / 3 / 6 / 13 トークン = 80 / 320 / 560 / 1120ms。
+  精度とのトレードオフ次第で 320ms まで詰める余地がある（4 章のチューニングで実測）
+- uk / ja の認識品質は FLEURS 参照文とほぼ一致（ja で同音異義語誤り、uk で軽微な
+  語形誤りのみ。モデルカード公称 CER 11% / WER 13% と整合）
+- 実装時の追加依存は transformers / accelerate（`device_map` に必要）。
+  soundfile / librosa / datasets は PoC のみの依存。NeMo 経路（約 200 パッケージ）に
+  対して大幅に軽量
+- `AutoModelForRNNT.from_pretrained` は `.nemo` ではなく HF 形式の重みを別途
+  ダウンロードする（`~/.cache/huggingface/` に共存し、干渉しない）
 
 ### 再現手順（素の環境）
 
@@ -132,7 +191,11 @@ python -c "import aiortc, aiohttp, nemo.collections.asr"  # 導入確認
 うち numpy はコンテナに同梱されている（Whisper 系旧実装とその依存
 `openai-whisper` / `pyaudio` / `scipy` は削除済み）。
 
-## 2. 実機検証チェックリスト
+## 2. 実機検証チェックリスト（NeMo 経路・フォールバック時のみ）
+
+**注: 0 章の Phase 0 合格により ASR バックエンドは Transformers に決定した。**
+本章の NeMo チェックリストは、Transformers 経路で E2E 検証中に問題が出て
+フォールバックする場合のみ実施する。
 
 `src/speech/nemotron.py` は NeMo の cache-aware ストリーミング API のシグネチャが
 未確認のまま書いたドラフト。`# TODO(DGX検証)` を付けた以下の 5 箇所を、コンテナ内の
