@@ -14,6 +14,67 @@ Mac 側での設計・実装の経緯は `SPEC.md`・`STREAMING_PLAN.md`・`PROT
 - 使用モデル: `nvidia/nemotron-3.5-asr-streaming-0.6b`（`src/speech/nemotron.py` の
   `MODEL_NAME`）
 
+## 0. 素の環境（コンテナなし）での事前検証の記録（2026-07-15）
+
+コンテナを立ち上げる前に、DGX Spark の素の環境（uv venv）で GPU を使った検証を先に行い、
+動作確認が取れてからコンテナ化する方針に変更した（検証の反復速度を優先する。
+コンテナ化は 1 章以降の手順で後追いする）。
+
+### 検証結果の要約
+
+| 項目 | 結果 |
+|------|------|
+| Python 3.13.13 venv（uv、aarch64） | OK |
+| torch 2.13.0+cu130（cu130 index） | OK。GB10 認識（compute capability 12.1）、GPU 行列積 OK |
+| nemo_toolkit 2.7.3（PyPI 最新） | インストール可。ただし本モデルのロードは不可（下記 1） |
+| NeMo git main（3.1.0+24c4f58a7） | OK。モデルロード・GPU 推論とも成功 |
+| Nemotron 3.5 ASR の GPU 推論 | OK。`transcribe()` スモークテスト成功（正弦波入力 → 空文字） |
+
+### 判明した事実
+
+1. **NeMo は git main が必須**。モデルの target クラス
+   `nemo.collections.asr.models.rnnt_bpe_models_prompt.EncDecRNNTBPEModelWithPrompt`
+   （LangID プロンプト対応 RNNT）は PyPI リリース版（2.7.3）に未収録。PyPI 版で
+   `ASRModel.from_pretrained` を呼ぶと抽象クラスへフォールバックし
+   `TypeError: Can't instantiate abstract class ASRModel ...` で失敗する。
+   モデルカードも `git+https://github.com/NVIDIA/NeMo.git@main` からの導入を指示している。
+2. **依存解決には `numba>=0.61` の明示が必要**。無指定だと numba 0.53.1 / llvmlite 0.36.0
+   （2021 年版、Python 3.13 の wheel なし）へ解決され、ソースビルドで失敗する。
+3. torch は PyTorch 公式の cu130 index に aarch64 wheel があり、GB10（sm_121）で動作する。
+   SPEC.md 策定時に懸念した「x86 前提の wheel 問題」は torch 本体については解消済み。
+4. モデル重みは `~/.cache/huggingface/hub/models--nvidia--nemotron-3.5-asr-streaming-0.6b`
+   （snapshot `f3d33339`）にキャッシュ済み。コンテナ化時は 1 章の起動コマンドの
+   マウントでそのまま再利用できる。
+5. `transcribe()` の主な引数は `audio` / `batch_size` / `return_hypotheses` などで、
+   `target_lang` は直接現れない（プロンプト条件付けの渡し方は 2 章の検証対象）。
+
+### コンテナ選定への影響
+
+NGC イメージの選定条件に「**同梱 NeMo が `EncDecRNNTBPEModelWithPrompt` を含むこと**」が
+加わる（digest 固定より先に確認する）。確認方法:
+
+```bash
+docker run --rm nvcr.io/nvidia/nemo:<タグ> python -c \
+  "import nemo.collections.asr.models.rnnt_bpe_models_prompt"
+```
+
+### 代替経路（未評価）
+
+モデルカードには Transformers（`transformers>=5.13.0`）の `AutoModelForRNNT` +
+`AutoProcessor` によるストリーミング推論経路も記載されている
+（`set_num_lookahead_tokens` / チャンクごとの言語プロンプト指定）。NeMo git main への
+依存を避け、リリース版ライブラリにバージョン固定できる可能性があるため、
+2 章の検証と並行して比較する。
+
+### 再現手順（素の環境）
+
+```bash
+uv venv --python 3.13 <venv>
+VIRTUAL_ENV=<venv> uv pip install torch --index-url https://download.pytorch.org/whl/cu130
+VIRTUAL_ENV=<venv> uv pip install 'numba>=0.61' \
+  'nemo_toolkit[asr] @ git+https://github.com/NVIDIA/NeMo.git@24c4f58a7643'
+```
+
 ## 1. NGC NeMo コンテナの準備
 
 ### イメージの選定と digest 固定
@@ -83,7 +144,9 @@ NeMo ソースおよび公式サンプルと突き合わせて確認・修正す
 
 チェックリスト（`src/speech/nemotron.py` 内の該当関数）:
 
-- [ ] `ASRModel.from_pretrained(MODEL_NAME)` の引数・戻り値の型（`_load_model_impl`）
+- [x] `ASRModel.from_pretrained(MODEL_NAME)` の引数・戻り値の型（`_load_model_impl`）
+      → 0 章で確認済み。`from_pretrained(model_name=...)` が
+      `EncDecRNNTBPEModelWithPrompt` を返す（NeMo git main が必要）
 - [ ] `att_context_size` の設定方法 — `encoder.set_default_att_context_size(...)` 相当の
       呼び出し規約（`load_model`）
 - [ ] `encoder.get_initial_cache_state` の引数（batch_size 等）と戻り値のアンパック順序
