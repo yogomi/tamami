@@ -17,8 +17,9 @@ from src.speech.fake import FakeStreamingRecognizer
 
 logger = logging.getLogger(__name__)
 
-# NemotronStreamingRecognizerが対応するチャンク長（ミリ秒）。src/speech/nemotron.py参照。
-CHUNK_MS_CHOICES = [80, 160, 320, 560, 1120]
+# NemotronStreamingRecognizerが対応するチャンク長（ミリ秒）。
+# Transformersのlookahead段階に対応する（src/speech/nemotron.pyのCHUNK_MS_TO_LOOKAHEAD参照）。
+CHUNK_MS_CHOICES = [80, 320, 560, 1120]
 
 
 def parse_args() -> argparse.Namespace:

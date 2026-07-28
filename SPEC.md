@@ -45,7 +45,7 @@ Whisper 系の旧実装（マイク入力・バッチ認識のローカルパイ
 | チャンクサイズ | 80ms / 160ms / 320ms / 560ms / 1120ms（可変） |
 | 発話終端レイテンシ | sub-100ms |
 | ライセンス | OpenMDW-1.1（商用利用可） |
-| フレームワーク | NeMo（主） / Transformers、Python ≥3.11 + PyTorch |
+| フレームワーク | Transformers ≥5.13（採用） / NeMo git main（フォールバック）、Python ≥3.13 + PyTorch |
 
 ### 精度（1.12s チャンク・LangID モード）
 
@@ -90,15 +90,15 @@ Nemotron 3.5 ASR は **ASR 専用であり、翻訳機能を持たない**（音
   `StreamingRecognizer` 抽象（ワーカースレッド・チャンク再バッファ・
   バックプレッシャ検出を共通化し、サブクラスは `_process` / `_finalize` のみ実装する）
   を導入し、開発・テスト用の `FakeStreamingRecognizer`（`src/speech/fake.py`）と
-  Nemotronドラフト実装 `NemotronStreamingRecognizer`（`src/speech/nemotron.py`）を
+  Nemotron実装 `NemotronStreamingRecognizer`（`src/speech/nemotron.py`）を
   用意した。`src/server/session.py` はこの抽象経由でASRに接続する構成になっている。
-- **Nemotron 3.5 ASR の実機検証（DGX Spark / NGCコンテナ）**：
-  `src/speech/nemotron.py` はNeMoのcache-awareストリーミングAPI
-  （`get_initial_cache_state` / `conformer_stream_step` 等）の正確なシグネチャが
-  手元で確認できないまま書いたドラフトであり、`# TODO(DGX検証)` を付けた箇所を
-  実機で確認・修正する必要がある。
-- チャンクサイズ（80ms〜1120ms、`att_context_size` 経由）と精度・遅延のトレードオフ検証
-  （実機検証と合わせて行う）。
+- ~~**Nemotron 3.5 ASR の実機検証（DGX Spark / NGCコンテナ）**~~ → 解決済み。
+  DGX Spark の素の環境での Phase 0 検証（`DGX_SETUP.md` 0 章）により、
+  NeMo cache-aware API のドラフトを廃し、**Transformers（≥5.13）の
+  ストリーミング推論**で `src/speech/nemotron.py` を実装した。
+  依存の導入は `uv sync --extra asr`。
+- チャンクサイズ（80/320/560/1120ms、lookahead トークン数経由）と精度・遅延の
+  トレードオフ検証（E2E 検証と合わせて行う）。
 - **EOU代替の無音endpointingのチューニング**：セグメント確定は現状
   `SilenceEndpointer`（`silence_threshold_db` / `min_silence_sec`）で行っている
   （モデルカードにEOU検出の記載がないため）。閾値・継続秒数の実環境（マイク・

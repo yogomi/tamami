@@ -9,6 +9,33 @@ dependencies = [
     "aiohttp",
 ]
 
+# ASR（Nemotron / Transformersストリーミング推論）を動かす環境でのみ導入する。
+# GPUなしのMac等では未導入のまま --asr fake でサーバーを起動できる。
+# 導入: uv sync --extra asr
+[project.optional-dependencies]
+asr = [
+    "torch",
+    "transformers>=5.13.0",
+    # NemotronAsrStreamingFeatureExtractorが実行時に要求する
+    "librosa",
+    # 制約がないと2021年のnumba 0.53.1に解決され、Python 3.13でビルド不能になる
+    # （DGX_SETUP.md 0章「判明した事実」参照）
+    "numba>=0.61",
+]
+
+# DGX Spark（aarch64 Linux）ではtorchをPyTorch公式のcu130 indexから解決する
+# （GB10 / Blackwell対応のCUDAビルド。DGX_SETUP.md 0章参照）。
+# それ以外のプラットフォーム（Mac等）ではPyPIの通常のtorchにフォールバックする。
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu130", marker = "platform_machine == 'aarch64'" },
+]
+
 [dependency-groups]
 dev = [
     "pytest",
