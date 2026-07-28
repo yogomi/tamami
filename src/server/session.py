@@ -8,11 +8,12 @@ feedする。認識器が生成するAsrEventはon_eventへ、過負荷・内部
 
 import asyncio
 import logging
-from typing import Awaitable, Callable, Optional
+from typing import Awaitable, Callable, Optional, cast
 
 import numpy as np
 from aiortc import RTCConfiguration, RTCPeerConnection, RTCSessionDescription
 from aiortc.mediastreams import MediaStreamError, MediaStreamTrack
+from av.audio.frame import AudioFrame
 from av.audio.resampler import AudioResampler
 
 from src.speech.streaming import AsrEvent, RecognizerOverloadedError, StreamingRecognizer
@@ -134,7 +135,9 @@ class StreamingSession:
         try:
             while True:
                 try:
-                    frame = await track.recv()
+                    # recv()の戻り型はFrame|Packetだが、on_trackでkind=="audio"の
+                    # トラックだけを_consumeへ渡しているため実際はAudioFrameが来る。
+                    frame = cast(AudioFrame, await track.recv())
                 except MediaStreamError:
                     logger.info("[%s] audio track ended", self._session_id)
                     break

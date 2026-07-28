@@ -24,9 +24,9 @@ RecognizerFactory = Callable[[], StreamingRecognizer]
 
 # aiohttp.web.Applicationにrecognizer_factoryを持たせる際のキー
 # （aiohttpの推奨に従い、プレーンな文字列キーではなくAppKeyを使う）
-_RECOGNIZER_FACTORY_KEY: web.AppKey[RecognizerFactory] = web.AppKey(
-    "recognizer_factory", RecognizerFactory
-)
+# 第2引数（repr用の実行時の型）はクラスしか受け付けないため、Callableである
+# RecognizerFactoryは渡せない。型は左辺の注釈で与える。
+_RECOGNIZER_FACTORY_KEY: web.AppKey[RecognizerFactory] = web.AppKey("recognizer_factory")
 
 
 class ConnectionHandler:

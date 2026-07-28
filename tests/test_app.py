@@ -8,6 +8,7 @@ ConnectionHandlerの振る舞いを検証する。WebRTC(webrtc_offer)の実確�
 """
 
 import asyncio
+from typing import AsyncIterator, Optional, Union
 
 import numpy as np
 from aiohttp import WSMsgType
@@ -16,22 +17,28 @@ from aiohttp.test_utils import TestClient, TestServer
 from src.server import protocol
 from src.server.app import create_app
 from src.speech.fake import FakeStreamingRecognizer
-from src.speech.streaming import AsrEvent, RecognizerOverloadedError
+from src.speech.streaming import AsrEvent, RecognizerOverloadedError, StreamingRecognizer
 
 
-class _StubRecognizer:
-    """StreamingRecognizerのインターフェースだけを満たすテスト用スタブ."""
+class _StubRecognizer(StreamingRecognizer):
+    """StreamingRecognizerの公開APIだけを差し替えたテスト用スタブ.
+
+    基底の__init__はワーカースレッドを起動し実行中のイベントループを要求するため、
+    意図的に呼ばない（公開API（feed/events/flush/close）をすべて上書きしており、
+    基底の内部状態には触れない）。継承しているのは、StreamingRecognizerを要求する
+    引数へ型として渡せるようにするため。
+    """
 
     def __init__(self) -> None:
-        self.fed: list = []
+        self.fed: list[np.ndarray] = []
         self.flushed = False
         self.closed = False
-        self._queue: "asyncio.Queue[object]" = asyncio.Queue()
+        self._queue: "asyncio.Queue[Optional[Union[AsrEvent, BaseException]]]" = asyncio.Queue()
 
-    def feed(self, pcm) -> None:
+    def feed(self, pcm: np.ndarray) -> None:
         self.fed.append(pcm)
 
-    async def events(self):
+    async def events(self) -> AsyncIterator[AsrEvent]:
         while True:
             item = await self._queue.get()
             if item is None:

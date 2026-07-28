@@ -1,0 +1,18 @@
+{
+  // 型チェック対象。poc/ は検証用の使い捨てスクリプトなので対象外とする。
+  "include": ["src", "tests"],
+  "exclude": ["**/__pycache__", "poc", ".venv"],
+
+  // uv が作る .venv を参照し、依存パッケージの型情報を解決する。
+  "venvPath": ".",
+  "venv": ".venv",
+
+  // pyproject.toml の requires-python = ">=3.13,<3.14" に合わせる。
+  "pythonVersion": "3.13",
+  "typeCheckingMode": "standard",
+
+  // torch / transformers は asr extra（uv sync --extra asr）でのみ入る。
+  // 未導入の環境でもチェックを通せるよう警告に落とす。
+  // 実際のimportは関数内でtry/exceptしており、実行時は明確なRuntimeErrorになる。
+  "reportMissingImports": "warning"
+}
